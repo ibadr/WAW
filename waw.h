@@ -89,6 +89,43 @@ public:
     return hdwf;
   }
 
+  int clientsDevice(int idx) {
+    int clients = -1;
+    std::map<int,int>::iterator itr = _numClientsMap.find(idx);
+    if (itr != _numClientsMap.end()) {
+      clients = itr->second;
+    }
+    return clients;
+  }
+
+  bool closeDevice(int idx) {
+    bool isSuccess = false;
+    std::map<int,int>::iterator itr = _numClientsMap.find(idx);
+    if (itr != _numClientsMap.end() && itr->second > 0) {
+      itr->second -= 1;
+      if (itr->second > 0)
+        isSuccess = true;
+      else { // numClients = 0 so close hardware
+        std::map<int,HDWF>::iterator itrH = _hdwfMap.find(idx);
+        if (itrH != _hdwfMap.end() ) {
+          HDWF hdwf = itrH->second;
+          BOOL succ;
+          succ = FDwfDeviceClose(hdwf);
+          isSuccess = (succ>0) ? true : false;
+          if (!isSuccess)
+            itr->second += 1; // this client is still registered because
+              // device was not closed
+        }
+      }
+    }
+    return isSuccess;
+  }
+
+  void clearDeviceMaps() {
+    _numClientsMap.clear();
+    _hdwfMap.clear();
+  }
+
 private:
   WAW() {}
   WAW(WAW const &) {}
