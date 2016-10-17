@@ -18,7 +18,7 @@
 #define __WAW_H__
 
 #include <digilent/waveforms/dwf.h> // already got extern "C"
-#include <vector>
+#include <map>
 
 class WAW
 {
@@ -32,8 +32,61 @@ public:
   int enumDevices(ENUMFILTER enumFilter) {
     int cDevice;
     BOOL succ;
-    succ = FDwfEnum(enumfilterDiscovery, &cDevice);
+    succ = FDwfEnum(enumFilter, &cDevice);
     return succ ? cDevice : -1;
+  }
+
+  bool openDevice(int idx, ENUMFILTER enumFilter = enumfilterAll) {
+  	bool isSuccess = false;
+  	if (idx < 0) {
+  		return isSuccess;
+  	}
+
+    std::map<int,int>::iterator itr = _numClientsMap.find(idx);
+    if (itr == _numClientsMap.end() || itr->second == 0) {// first encounter,
+                                // or second encounter with zero clients
+    	int cDevice; BOOL succ;
+    	succ = FDwfEnum(enumfilterAll, &cDevice); // enumerate first to help with checking isInUse next
+      if (!succ)
+        return isSuccess;
+
+    	BOOL isInUse;
+    	succ = FDwfEnumDeviceIsOpened(idx, &isInUse);
+      if (!succ)
+        return isSuccess;
+    	if (isInUse) {
+    		return isSuccess;
+    	}
+      HDWF hdwf;
+    	isSuccess = (FDwfDeviceOpen(idx, &hdwf)>0) ? true : false;
+      isSuccess = isSuccess && (hdwf>0);
+
+      if (isSuccess) {
+        if (itr == _numClientsMap.end()) {
+          _numClientsMap.insert(std::pair<int,int>(idx,1));
+          _hdwfMap.insert(std::pair<int,HDWF>(idx,hdwf));
+        } else {
+          _numClientsMap[idx] += 1;
+          _hdwfMap[idx] = hdwf;
+        }
+      }
+    } else {
+      _numClientsMap[idx] += 1; // idx is already open under our control
+      isSuccess = true;
+    }
+  	return isSuccess;
+  }
+
+  HDWF hdwfDevice(int idx) {
+    HDWF hdwf = -1;
+    std::map<int,int>::iterator itr = _numClientsMap.find(idx);
+    if (itr != _numClientsMap.end() && itr->second > 0) {
+      std::map<int,HDWF>::iterator itrH = _hdwfMap.find(idx);
+      if (itrH != _hdwfMap.end() ) {
+        hdwf = itrH->second;
+      }
+    }
+    return hdwf;
   }
 
 private:
@@ -41,8 +94,8 @@ private:
   WAW(WAW const &) {}
   void operator=(WAW const &) {}
 
-  // std::vector<HDWF> _hdwfVec;
-  // std::vector<int> _clientsVec;
+  std::map<int,HDWF> _hdwfMap;
+  std::map<int,int> _numClientsMap;
 };
 
 #endif
