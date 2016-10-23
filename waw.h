@@ -17,7 +17,12 @@
 #ifndef __WAW_H__
 #define __WAW_H__
 
+#ifdef WIN32 || WIN64
+#include <dwf.h> // already got extern "C"
+#else
 #include <digilent/waveforms/dwf.h> // already got extern "C"
+#endif
+
 #include <map>
 
 class WAW
